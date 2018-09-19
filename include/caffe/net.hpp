@@ -326,6 +326,25 @@ class Net {
   /// the weight decay multipliers for learnable_params_
   vector<float> params_weight_decay_;
   vector<bool> has_params_decay_;
+  ///the individual weight decay multipliers for each parameter in the learnable_params_
+  vector<shared_ptr<Blob<Dtype>> > params_individual_weight_decay_;
+  vector<bool> has_params_individual_weight_decay_;
+  ///the group lasso weight decay multipliers for breadth regularization
+  vector<float> params_breadth_decay_;
+  vector<bool>  has_params_breadth_decay_;
+
+  //the group lasso weight decay multipliers for kernel shape regularization
+  vector<float> params_kernel_shape_decay_;
+  vector<bool> has_params_kernel_shape_decay_;
+
+  //the block group lasso spec
+  vector< vector<BlockGroupLassoSpec>> params_block_group_lasso_;
+  vector<bool> has_params_block_group_lasso_;
+
+  //the regularization type
+  vector<string> params_regularization_type_;
+  vector<bool> has_params_regularization_type_;
+
   /// The bytes of memory used by this net
   size_t memory_used_;
   /// Whether to compute and display debug info for the net.

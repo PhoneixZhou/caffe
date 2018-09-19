@@ -49,10 +49,10 @@ fi
 
 echo "solver_mode: $solver_mode" >> $solverfile 
 
-if ["$#" -ge 8];then 
+if [ "$#" -ge 8 ]; then 
     tunemodel=$8
     file_ext=$(echo ${tunemodel} | rev | cut -d'.' -f 1 | rev)
-    if [ "$file_ext" = "caffemodel" ];then 
+    if [ "$file_ext" = "caffemodel" ]; then 
       ./build/tools/caffe.bin train --solver=$solverfile --weights=$model_path/$tunedmodel > "${snapshot_path}/train.info" 2>&1
     else 
       ./build/tools/caffe.bin train --solver=$solverfile --snapshot=$model_path/$tunedmodel > "${snapshot_path}/train.info" 2>&1

@@ -454,8 +454,43 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
     learnable_param_ids_.push_back(learnable_param_id);
     has_params_lr_.push_back(param_spec->has_lr_mult());
     has_params_decay_.push_back(param_spec->has_decay_mult());
+    has_params_individual_weight_decay_.push_back(param_spec->has_decay_proto());
+    has_params_breadth_decay_.push_back(param_spec->has_breadth_decay_mult());
+    has_params_regularization_type_.push_back(param_spec->has_regularization_type());
+    has_params_kernel_shape_decay_.push_back(param_spec->has_kernel_shape_decay_mult());
+    has_params_block_group_lasso_.push_back(param_spec->block_group_lasso_size());
     params_lr_.push_back(param_spec->lr_mult());
     params_weight_decay_.push_back(param_spec->decay_mult());
+    //read, parse and convert decay blob
+    if(IfFileExists(param_spec->decay_proto())){
+      BlobProto blob_proto;
+      CHECK(ReadProtoFromBinaryFile(param_spec->decay_proto().c_str(),&blob_proto));
+      shared_ptr< Blob<Dtype> > decay_blob(new Blob<Dtype>());
+      decay_blob->FromProto(blob_proto);
+      params_individual_weight_decay_.push_back(decay_blob);
+      CHECK_EQ(learnable_params_.back()->shape_string(),params_individual_weight_decay_.back()->shape_string());
+      LOG(INFO)<<"Copying weight decay blob "
+         <<params_individual_weight_decay_.back()->shape_string()
+         <<" from "<<param_spec->decay_proto();
+    }else if(param_spec->decay_proto()==""){
+      params_individual_weight_decay_.push_back(shared_ptr<Blob<Dtype>>());
+    }else{
+      LOG(FATAL)<<"File does not exist: "<<param_spec->decay_proto();
+    }
+
+    params_breadth_decay_.push_back(param_spec->breadth_decay_mult());
+    params_regularization_type_.push_back(param_spec->regularization_type());
+    params_kernel_shape_decay_.push_back(param_spec->kernel_shape_decay_mult());
+    vector<BlockGroupLassoSpec> block_spec;
+    for(int i = 0;i < param_spec->block_group_lasso_size();i++){
+      block_spec.push_back(param_spec->block_group_lasso(i));
+    }
+    params_block_group_lasso_.push_back(block_spec);
+    if(layer_param.has_convolution_param()){
+      param_groups_.push_back(layer_param.convolution_param().group());
+    }else{
+      param_groups_.push_back(1);
+    }
   } else {
     // Named param blob with name we've seen before: share params
     const int owner_net_param_id = param_names_index_[param_name];
@@ -511,6 +546,17 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
         params_weight_decay_[learnable_param_id] = param_spec->decay_mult();
       }
     }
+
+    if(param_spec->has_decay_proto()){
+      NOT_IMPLEMENTED;
+    }
+
+    if(param_spec->has_breadth_decay_mult()){
+      if(has_params_breadth_decay_[learnable_param_id]){
+        CHECK_EQ(param_spec->breadth_decay_mult(),)
+      }
+    }
+
   }
 }
 

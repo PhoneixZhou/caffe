@@ -327,6 +327,12 @@ message ParamSpec {
   optional float kernel_shape_decay_mult = 6 [default = 0.0];
 
   repeated BlockGroupLassoSpec block_group_lasso = 7;
+
+  //To specify local regularization type ("L1"/"L2")
+  optional string regularization_type = 8 [default = ""];
+
+  //The binary proto file specifying the local weight decay multipliers for individual weights
+  optional string decay_proto = 9 [default = ""];
 }
 
 //Specifies shape and decay multiplier of a block, on which group lasso regularization is enforced.
