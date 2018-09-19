@@ -211,6 +211,76 @@ __global__ void add_kernel(const int n, const Dtype* a,
   }
 }
 
+/***************implementation of ssl functions**********************/
+
+template <typename Dtype>
+__global__ void zerout_kernel(void * mutable_gpu_data,int count, Dtype thre){
+  Dtype* data_ptr_tmp = static_cast<Dtype*>(mutable_gpu_data);
+
+  int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  while(tid<count){
+    if(data_ptr_tmp[tid]<thre && data_ptr_tmp[tid]>(-thre)){
+      data_ptr_tmp[tid] = 0;
+    }
+    tid += gridDim.x * blockDim.x;
+  }
+}
+template <typename Dtype>
+void caffe_gpu_zerout(void * mutable_gpu_data,const int count,Dtype th){
+  zerout_kernel<<<CAFFE_GET_BLOCKS(count),CAFFE_CUDA_NUM_THREADS>>>(mutable_gpu_data,count,th);
+}
+
+template void caffe_gpu_zerout<int>(void* mutable_gpu_data, const int count, int th);
+template void caffe_gpu_zerout<unsigned int>(void * mutable_gpu_data,const int count, unsigned int th);
+template void caffe_gpu_zerout<float>(void *mutable_gpu_data,const int count, float th);
+template void caffe_gpu_zerout<double>(void *mutable_gpu_data,const int count, double th);
+
+DEFINE_AND_INSTANTIATE_GPU_UNARY_FUNC(if_nonzerout,y[index] = ((x[index]>= Dtype(ZEROUT_THRESHOLD) || x[index] <= Dtype(-ZEROUT_THRESHOLD)) ? 1:0))
+
+
+template <>
+void caffe_gpu_sparse_dense2csr<float>(const int M, const int N,
+const float* A, int * nnzPerRow,
+float* A_nonzero_buf, int* A_idx_pointer_buf, int * A_nonzero_idx_buf, int* nnz_total){
+  CUSPARSE_CHECK(cusparseSnnz(Caffe::cusparse_handle(),
+  CUSPARSE_DIRECTION_COLUMN,
+  N,M,
+  Caffe::cusparse_matdescr(),
+  A,N,
+  nnzPerRow,//pre row for c style row-major matrix
+  nnz_total
+  ));
+  CUSPARSE_CHECK(cusparseSdense2csc(Caffe::cusparse_handle(),
+                N,M,
+                Caffe::cusparse_matdescr(),
+                A,N,
+                nnzPerRow,
+                A_nonzero_buf,A_nonzero_idx_buf,A_idx_pointer_buf));
+}
+
+template <>
+void caffe_gpu_sparse_dense2csr<double>(const int M, const int N,
+     const double *A, int* nnzPerRow,
+     double* A_nonzero_buf,int * A_idx_pointer_buf,int * A_nonzero_idx_buf,int *nnz_total){
+  CUSPARSE_CHECK(cusparseDnnz(Caffe::cusparse_handle(),
+      CUSPARSE_DIRECTION_COLUMN,
+      N,M,
+      Caffe::cusparse_matdescr(),
+      A,N,
+      nnzPerRow,
+      nnz_total));
+  CUSPARSE_CHECK(cusparseDdense2csc(Caffe::cusparse_handle(),
+      N,M,
+      Caffe::cusparse_matdescr(),
+      A,N,
+      nnzPerRow,
+      A_nonzero_buf,A_nonzero_idx_buf,A_idx_pointer_buf
+    ));
+  }
+
+
+/***************end of implementation of ssl functions***************/
+
 template <>
 void caffe_gpu_add<float>(const int N, const float* a, const float* b,
     float* y) {

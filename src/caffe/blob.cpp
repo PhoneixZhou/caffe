@@ -5,6 +5,7 @@
 #include "caffe/common.hpp"
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/math_functions.hpp"
+#include "caffe/util/mmio.hpp"
 
 namespace caffe {
 
@@ -552,6 +553,129 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
     }
   }
 }
+
+/**********************implementation of ssl functions********************/
+template <typename Dtype>
+Dtype Blob<Dtype>::GetSparsity(){
+  int zero_num = 0;
+  for(int i = 0;i<this->count();i++){
+    if(this->cpu_data()[i]<ZEROUT_THRESHOLD && this->cpu_data()[i]>-ZEROUT_THRESHOLD){
+      zero_num++;
+    }
+  }
+  return (Dtype)(zero_num)/(Dtype)(this->count());
+}
+
+template <typename Dtype>
+void Blob<Dtype>::WriteToNistMMIO(string filename) const{
+  if(filename.empty()){
+    filename = shape_string()+".blob";
+  }
+
+  MM_typecode matcode;
+  FILE* fp = fopen(filename.c_str(),"w+");
+  mm_initialize_typecode(&matcode);
+  mm_set_matrix(&matcode);
+  mm_set_array(&matcode);
+  mm_set_real(&matcode);
+  mm_set_general(&matcode);
+
+  if(NULL == fp){
+    LOG(WARNING)<<"Failed to save" <<filename;
+    return;
+  }
+  mm_write_banner(fp,matcode);
+  int M = this->shape(0);
+  int N = this->count()/M;
+  mm_write_mtx_array_size(fp,M,N);
+
+  const Dtype * data_ptr = this->cpu_data();
+  if(num_axes()==4){
+    for(int c = 0;c<this->shape(1);c++){
+      for(int h = 0;h<this->shape(2);h++){
+        for(int w = 0;h<this->shape(3);w++){
+          for(int n = 0;n<this->shape(0);n++){
+            fprintf(fp,"%20g\n",(double)(*(data_ptr+((n * this->shape(1)+c)*this->shape(2)+h)*this->shape(3)+w)));
+          }
+        }
+      }
+    }
+  }else if(num_axes()==2){
+    for(int c = 0;c<this->shape(1);c++){
+      for(int n = 0;n<this->shape(0);n++){
+        fprintf(fp,"%20g\n",(double)(*(data_ptr+n * this->shape(1)+c)));
+      }
+    }
+  }
+
+  fclose(fp);
+}
+
+template <typename Dtype>
+void Blob<Dtype>::Zerout(){
+  //zero out elements whose values are smaller than thre
+  Dtype thre = Dtype(ZEROUT_THRESHOLD);
+  Dtype* data_ptr_tmp = 0;
+  switch(data_->head()){
+    case SyncedMemory::HEAD_AT_CPU:
+      data_ptr_tmp = static_cast<Dtype*>(data_->mutable_cpu_data());
+      for(int i = 0;i<count_;i++){
+        if(data_ptr_tmp[i]<thre && data_ptr_tmp[i]>(-thre)){
+          data_ptr_tmp[i] = 0;
+        }
+      }
+      break;
+    case SyncedMemory::HEAD_AT_GPU:
+    case SyncedMemory::SYNCED:
+      #ifndef CPU_ONLY
+      caffe_gpu_zerout(data_->mutable_gpu_data(),count_,thre);
+      #else 
+      NO_GPU;
+      #endif 
+      break;
+    default:
+    LOG(FATAL)<<"Syncedmen not initialized.";
+  }
+}
+
+template <typename Dtype>
+void Blob<Dtype>::Disconnect(DisconnectMode mode, int group){
+  this->Zerout();
+  if(mode == ELTWISE){
+    switch(Caffe::mode()){
+      case Caffe::CPU:{
+        caffe_cpu_if_nonzerout(count_,
+            static_cast<const Dtype*>(data_->cpu_data()),
+            static_cast<Dtype*>(connectivity_->mutable_cpu_data()));
+        break;
+      }
+      case Caffe::GPU:{
+        #ifndef CPU_ONLY 
+        caffe_gpu_if_nonzerout(count_,
+                               static_cast<const Dtype*>(data_->gpu_data()),
+                               static_cast<Dtype*>(connectivity_->mutable_gpu_data()));
+        #else 
+        NO_GPU;
+        #endif 
+        break;
+      }
+      default:
+      LOG(FATAL)<<"Unknown caffe mode: "<<Caffe::mode();
+    }
+  }else if(mode == GRPWISE){
+    CHECK_GE(group,1);
+    for(int g=0;g<group;++g){
+      caffe_cpu_all_zero_mask(shape_[0]/group,
+                              count_/shape_[0],
+                              static_cast<const Dtype*>(data_->cpu_data())+count_/group *g,
+                              static_cast<Dtype*>(connectivity_->mutable_cpu_data())+count_/group*g);
+    }
+  }
+
+}
+
+
+/**********************end if ssl functions*******************************/
 
 INSTANTIATE_CLASS(Blob);
 template class Blob<int>;

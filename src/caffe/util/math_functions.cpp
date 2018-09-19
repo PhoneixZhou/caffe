@@ -367,6 +367,15 @@ template <>
 double caffe_cpu_asum<double>(const int n, const double* x) {
   return cblas_dasum(n, x, 1);
 }
+template <>
+int caffe_cpu_asum<int>(const int n,const int* x){
+  int sum = 0;
+  for(int i = 0;i<n;i++){
+    sum+= abs(x[i]);
+  }
+  return sum;
+}
+
 
 template <>
 void caffe_cpu_scale<float>(const int n, const float alpha, const float *x,
@@ -381,5 +390,139 @@ void caffe_cpu_scale<double>(const int n, const double alpha, const double *x,
   cblas_dcopy(n, x, 1, y, 1);
   cblas_dscal(n, alpha, y, 1);
 }
+
+/*************************start of ssl methods************************/
+template <>
+void caffe_cpu_sparse_dense2csr<float>(const int M, const int N,
+     float* A,
+     float* A_nonzero_buf, int* A_nonzero_idx_buf,int * A_idx_pointer_buf){
+      #ifdef USE_MKL 
+      MKL_INT info;
+      const MKL_INT job[] = {0,0,0,2,M*N,1};
+      mkl_sdnscsr(job,&M,&N,A,
+        &N,A_nonzero_buf,A_nonzero_idx_buf,A_idx_pointer_buf, &info);
+      if(info){
+        LOG(FATAL)<<"The routine is interrupted processing the "<<info<<"-th row "
+        <<"because there is no space in the arrays acsr and ja according to the value nzmax.";
+      }
+      #else 
+      NOT_IMPLEMENTED;
+      #endif 
+     }
+template <>
+void caffe_cpu_sparse_dense2csr<double>(const int M, const int N,
+    double* A,
+    double* A_nonzero_buf,int* A_nonzero_idx_buf,int* A_idx_pointer_buf){
+      #ifdef USE_MKL
+      MKL_INT info;
+      const MKL_INT job[] = {0,0,0,2,M*N,1};
+      mkl_ddnscsr(job,&M,&N,A, 
+        &N,A_nonzero_buf,A_nonzero_idx_buf,A_idx_pointer_buf,&info);
+      if(info){
+        LOG(FATAL)<<"The routine is interrupted prcessing the "<<
+            info <<"-th row "
+            <<"because there is non space in the arrays acsr and ja according to the value nzmax.";
+      }
+      #else
+      NOT_IMPLEMENTED; 
+      #endif 
+    }
+
+template <typename Dtype>
+void caffe_cpu_if_all_zero(const int M, const int N, const Dtype* x,int *y,bool dimen){
+  if(dimen){//along columns
+    for(int col=0;col<N;++col){
+      y[col] = true;
+      for(int row = 0;row<M;row++){
+        if(x[col+row * N] !=0){
+          y[col] = false;
+          break;
+        }
+      }
+    }
+  }else{//along rows
+    for(int row = 0;row<M;++row){
+      y[row] = true;
+      for(int col = 0;col<N;col++){
+        if(x[col + row * N] !=0){
+          y[row] = false;
+          break;
+        }
+      }
+    }   
+  }
+}
+
+template 
+void caffe_cpu_if_all_zero(const int M,const int N, const float* x,int* y,bool dimen);
+template 
+void caffe_cpu_if_all_zero(const int M,const int N, const double* x,int* y,bool dimen);
+
+template <typename Dtype>
+void caffe_cpu_all_zero_mask(const int M,const int N,const Dtype* X,Dtype * Y){
+  //along rows
+  Dtype val = (Dtype)1;
+  for(int row = 0;row<M;++row){
+    val = (Dtype)0;
+    for(int col = 0;col<N;col++){
+      if(X[col + row * N] !=0){
+        val = (Dtype)1;
+        break;
+      }
+    }
+    caffe_set(N,val,Y+row*N);
+  }
+
+  //along columns
+  for(int col = 0;col < N;++col){
+    val = (Dtype)0;
+    for(int row = 0;row<M;row++){
+      if(X[col + row *N] !=0){
+        val = (Dtype)1;
+        break;
+      }
+    }
+    if(!val){
+      for(int row = 0;row<M;row++){
+        Y[col + row *N] = val;
+      }
+    }
+  }
+}
+template 
+void caffe_cpu_all_zero_mask(const int M, const int N,const float* X,float*y);
+template 
+void caffe_cpu_all_zero_mask(const int M, const int N,const double *X,double *y);
+template 
+void caffe_cpu_all_zero_mask(const int M, const int N, const int * X,int *y);
+template 
+void caffe_cpu_all_zero_mask(const int M, const int N,const unsigned int *X, unsigned int * y);
+
+template <typename Dtype>
+void caffe_cpu_concatenate_rows_cols(const int M, const int N, const Dtype * x, Dtype* y,const int* col_mask, const int* row_mask){
+  int left_cols = 0;
+  for(int i = 0;i<N;i++){
+    left_cols += !col_mask[i];
+  }
+
+  int cur_row = 0;
+  for(int row = 0;row<M;row++){
+    if(!row_mask[row]){
+      int cur_col = 0;
+      for(int col = 0;col<N;col++){
+        if(!col_mask[col]){
+          y[cur_row * left_cols + cur_col] = x[row * N + col];
+          cur_col++;
+        }
+      }
+      CHECK_EQ(cur_col,left_cols);
+      cur_row++;
+    }
+  }
+}
+
+template void caffe_cpu_concatenate_rows_cols<float>(const int M,const int N,const float* x,float* y,const int*col_mask,const int* row_mask);
+template void caffe_cpu_concatenate_rows_cols<double>(const int M,const int N,const double * x,double * y, const int* col_mask,const int* row_mask);
+/************************end of ssl methods***************************/
 
 }  // namespace caffe

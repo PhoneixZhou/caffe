@@ -69,6 +69,8 @@ private:\
 // is executed we will see a fatal log.
 #define NOT_IMPLEMENTED LOG(FATAL) << "Not Implemented Yet"
 
+#define ZEROUT_THRESHOLD (0.0001)
+
 // See PR #1236
 namespace cv { class Mat; }
 
@@ -136,6 +138,8 @@ class Caffe {
   inline static curandGenerator_t curand_generator() {
     return Get().curand_generator_;
   }
+  inline static cusparseHandle_t cusparse_handle(){return Get().cusparse_handle_;}
+  inline static cusparseMatDescr_t cusparse_matdescr(){return Get().cusparse_matdescr_;}
 #endif
 
   // Returns the mode: running on CPU or GPU.
@@ -171,6 +175,8 @@ class Caffe {
 #ifndef CPU_ONLY
   cublasHandle_t cublas_handle_;
   curandGenerator_t curand_generator_;
+  cusparseHandle_t cusparse_handle_;
+  cusparseMatDescr_t cusparse_matdescr_;
 #endif
   shared_ptr<RNG> random_generator_;
 

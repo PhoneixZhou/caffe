@@ -145,8 +145,37 @@ DEFINE_CAFFE_CPU_UNARY_FUNC(fabs, y[i] = std::fabs(x[i]))
 template <typename Dtype>
 void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
 
-#ifndef CPU_ONLY  // GPU
+/*********************ssl methods*********************************/
+//dense matrix A to sparse matrix A in CSR format
+template <typename Dtype>
+void caffe_cpu_sparse_dense2csr(const int M, const int N,
+                               Dtype * A,
+                               Dtype * A_nonzero_buf,
+                               int* A_nonzero_idx_buf,
+                               int* A_idx_pointer_buf);
 
+template <typename Dtype>
+inline int8_t caffe_if_nonzerout(Dtype val){
+    Dtype thre = Dtype(ZEROUT_THRESHOLD);
+    if(val >= thre || val<=(-thre)) return 1;
+    else return 0;
+}
+DEFINE_CAFFE_CPU_UNARY_FUNC(if_nonzerout,y[i] = caffe_if_nonzerout<Dtype>(x[i]));
+//get if columns(true)/rows(false) in matrix X are all zeros
+template<typename Dtype>
+void caffe_cpu_if_all_zero(const int M, const int N, const Dtype *X, int *y,bool dimen = true);
+
+//get the mask(0) of all-zero columns and rows
+template <typename Dtype>
+void caffe_cpu_all_zero_mask(const int M, const int N,const Dtype *X ,Dtype* y);
+
+//remove all zero rows and columns, and concatenate remaining ones together
+template <typename Dtype>
+void caffe_cpu_concatenate_rows_cols(const int M,const int N, const Dtype* x,Dtype * y,const int* col_mask,const int* row_mask);
+
+/*********************end of ssl methods**************************/
+
+#ifndef CPU_ONLY  // GPU
 // Decaf gpu gemm provides an interface that is almost the same as the cpu
 // gemm function - following the c convention and calling the fortran-order
 // gpu code under the hood.
@@ -187,6 +216,19 @@ void caffe_gpu_add_scalar(const int N, const Dtype alpha, Dtype *X);
 
 template <typename Dtype>
 void caffe_gpu_scal(const int N, const Dtype alpha, Dtype *X);
+
+/*********************ssl methods*********************************/
+//dense matrix A to sparse matrix A in CSR format
+template <typename Dtype>
+void caffe_gpu_sparse_dense2csr(const int M, const int N,
+const Dtype* A, int * nnzPerRow,
+Dtype* A_nonzero_buf, int* A_idx_pointer_buf, int * A_nonzero_idx_buf, int* nnz_total);
+
+template <typename Dtype>
+void caffe_gpu_zerout(void * mutable_gpu_data,int count, Dtype th);
+template<typename Dtype>
+void caffe_gpu_if_nonzerout(const int n, const Dtype* x, Dtype* y);
+/*********************end of ssl methods**************************/
 
 #ifndef CPU_ONLY
 template <typename Dtype>
@@ -264,6 +306,14 @@ __global__ void name##_kernel(const int n, const Dtype* x, Dtype* y) { \
     operation; \
   } \
 } \
+template <> \
+void caffe_gpu_##name<int>(const int n,const int* x,int *y){ \
+    NOT_IMPLEMENTED; \
+}\
+template <> \
+void caffe_gpu_##name<unsigned int>(const int n, const unsigned int* x, unsigned int * y){ \
+    NOT_IMPLEMENTED;\
+}\
 template <> \
 void caffe_gpu_##name<float>(const int n, const float* x, float* y) { \
   /* NOLINT_NEXT_LINE(whitespace/operators) */ \

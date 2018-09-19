@@ -231,6 +231,15 @@ class Blob {
   void FromProto(const BlobProto& proto, bool reshape = true);
   void ToProto(BlobProto* proto, bool write_diff = false) const;
 
+  /*************************ssl(learning sparisity structure) functions*************************/
+  enum DisconnectMode{ELTWISE,GRPWISE};//how to disconnect
+  Dtype GetSparsity();
+  ///@brief snapshot to format of Matrix Market http://math.nist.gov/MatrixMarket/formats.html
+  void WriteToNistMMIO(string filename = "") const;
+  void Disconnect(DisconnectMode mode, int group = 1);
+  void Zerout();
+  /*************************end of ssl function*******************/
+
   /// @brief Compute the sum of absolute values (L1 norm) of the data.
   Dtype asum_data() const;
   /// @brief Compute the sum of absolute values (L1 norm) of the diff.
@@ -268,6 +277,7 @@ class Blob {
 
  protected:
   shared_ptr<SyncedMemory> data_;
+  shared_ptr<SyncedMemory> connectivity_;
   shared_ptr<SyncedMemory> diff_;
   shared_ptr<SyncedMemory> shape_data_;
   vector<int> shape_;

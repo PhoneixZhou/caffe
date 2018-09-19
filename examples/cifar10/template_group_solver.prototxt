@@ -1,0 +1,22 @@
+#The train/test net protocol buffer definition
+net: "examples/cifar10/cifar10_full_train_test_kernel_shape.prototxt"
+
+test_iter:100 
+
+test_interval:1000
+
+momentum:0.9
+regularization_type:"L2"
+
+lr_policy:"multistep"
+gamma:0.1
+
+stepvalue:100000
+stepvalue:160000
+stepvalue:180000
+
+max_iter:200000
+
+display:200
+snapshot:100000
+

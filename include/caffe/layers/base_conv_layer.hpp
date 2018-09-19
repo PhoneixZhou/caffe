@@ -23,6 +23,7 @@ class BaseConvolutionLayer : public Layer<Dtype> {
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
+  virtual void WeightAlign();//ssl functions
 
   virtual inline int MinBottomBlobs() const { return 1; }
   virtual inline int MinTopBlobs() const { return 1; }
@@ -167,6 +168,26 @@ class BaseConvolutionLayer : public Layer<Dtype> {
 
   Blob<Dtype> col_buffer_;
   Blob<Dtype> bias_multiplier_;
+
+
+  //ssl structures
+  // Blob<Dtype> weight_buffer_;//store nonzero weights in the continuous memory
+
+  Blob<Dtype> nz_weight_values_; //nonzero elements
+  Blob<int> nz_weight_indices_;//index of nonzero
+  Blob<int> nz_weight_index_pointers_;//pointer (index) of indices
+  Blob<int> nz_per_row_; //nonzero per row for cusparse
+  vector<int> nz_nums_;// the number of nonzero for cusparse
+  bool is_concatenating_weights_features_;//if use concatenation scheme to compress dense weights and features together
+  Blob<int> col_buf_mask_;
+  Blob<int> row_buf_mask_;
+  vector<int> left_columns_; // the number of left columns of weight matrix for each group
+  vector<int> left_rows_;    // the number of left rows of weight matrix for each group 
+  Blob<Dtype> squeezed_weight_buffer_;
+  //end of ssl structures
+
+
+
 };
 
 }  // namespace caffe

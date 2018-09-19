@@ -255,6 +255,10 @@ message SolverParameter {
   // weights parameter separated by ',' (like in a command string) or
   // in repeated weights parameters separately.
   repeated string weights = 42;
+
+  optional float breadth_decay = 43[default = 0.0];//the group weight decay on each kernel
+  optional float kernel_shape_decay = 44[default = 0.0];//the group weight decay on all elements having the same coordinate in each kernel
+  optional float block_group_decay  = 45[default = 0.0];//the group weight decay on all elements in each block
 }
 
 // A message that stores the solver snapshots
@@ -317,6 +321,24 @@ message ParamSpec {
 
   // The multiplier on the global weight decay for this parameter.
   optional float decay_mult = 4 [default = 1.0];
+
+  //The multiplier on the global group lasso weight decay for this parameter.
+  optional float breadth_decay_mult = 5 [default = 0.0];
+  optional float kernel_shape_decay_mult = 6 [default = 0.0];
+
+  repeated BlockGroupLassoSpec block_group_lasso = 7;
+}
+
+//Specifies shape and decay multiplier of a block, on which group lasso regularization is enforced.
+message BlockGroupLassoSpec{
+  //the size of the block along x-dimension (i.e. along row of a matrix)
+  optional uint32 xdimen = 1 [default=1];
+
+  //the size of the block along y-dimension (i.e. along column of a matrix)
+  optional uint32 ydimen = 2 [default=1];
+
+  //loca decay multiplier of group lasso regularization on this block
+  optional float block_decay_mult = 3 [default = 1.0];
 }
 
 // NOTE
@@ -352,6 +374,15 @@ message LayerParameter {
   //
   // The size must be either 0 or equal to the number of bottoms.
   repeated bool propagate_down = 11;
+
+  //Specifies how to deal with connections whose weights are recovered/initialized as zeros
+  //Used for fine-tuning
+  enum ConnectivityMode{
+    CONNECTED = 0;//keep connected
+    DISCONNECTED_ELTWISE = 1; //disconnect all zero-weights connections
+    DISCONNECTED_GRPWISE = 2; //disconnect connections lying in all-zero rows and all-zero columns 
+  }
+  optional ConnectivityMode connectivity_mode = 12 [default = CONNECTED];
 
   // Rules controlling whether and when a layer is included in the network,
   // based on the current NetState.  You may specify a non-zero number of rules
@@ -640,6 +671,16 @@ message ConvolutionParameter {
   // implementation; for input blobs with num_axes != 2, this option is
   // ignored and the ND implementation will be used.)
   optional bool force_nd_im2col = 17 [default = false];
+
+  //the method of convolutional computation
+  enum ConvMode{
+    LOWERED_GEMM = 0;//gemm on lowered tensors
+    LOWERED_CSRMM = 1;//sparse weight matrix in CSR format * lowered feature maps
+    LOWERED_CCNMM = 2;//removing all-zero rows & columns and ConCateNating remaining ones, the do gemm. 
+    DIRECT_SCONV  = 3;//direct convolution on tensors without lowering, harnessing sparsity.
+    DIRECT_DCONV  = 4;//direct convolution on tensors without lowering, dense format.
+  }
+  optional ConvMode conv_mode = 21 [default = LOWERED_GEMM];
 }
 
 message CropParameter {
