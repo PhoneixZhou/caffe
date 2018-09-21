@@ -169,6 +169,10 @@ void caffe_cpu_if_all_zero(const int M, const int N, const Dtype *X, int *y,bool
 template <typename Dtype>
 void caffe_cpu_all_zero_mask(const int M, const int N,const Dtype *X ,Dtype* y);
 
+//get column(true)/row(false) sparsity in matrix
+template <typename Dtype>
+Dtype caffe_cpu_group_sparsity(const int M, const int N, const Dtype* X, bool dimen = true);
+
 //remove all zero rows and columns, and concatenate remaining ones together
 template <typename Dtype>
 void caffe_cpu_concatenate_rows_cols(const int M,const int N, const Dtype* x,Dtype * y,const int* col_mask,const int* row_mask);

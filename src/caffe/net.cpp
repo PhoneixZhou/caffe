@@ -553,10 +553,45 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
 
     if(param_spec->has_breadth_decay_mult()){
       if(has_params_breadth_decay_[learnable_param_id]){
-        CHECK_EQ(param_spec->breadth_decay_mult(),)
+        CHECK_EQ(param_spec->breadth_decay_mult(),params_breadth_decay_[learnable_param_id])
+          <<"Shared param '" << param_name << "' has mismatched breadth_decay_mult.";
+      }else{
+        has_params_breadth_decay_[learnable_param_id] = true;
+        params_breadth_decay_[learnable_param_id] = param_spec->breadth_decay_mult();
       }
     }
 
+    if(param_spec->has_regularization_type()){
+      if(has_params_regularization_type_[learnable_param_id]){
+        CHECK_EQ(param_spec->regularization_type(),params_regularization_type_[learnable_param_id])
+        <<"Shared param '" << param_name << "' has mismatched regularization_type.";
+      }else {
+        has_params_regularization_type_[learnable_param_id] = true;
+        params_regulariztion_type_[learnable_param_id] = param_spec->regularization_type();
+      }
+    }
+
+    if(param_spec->has_kernel_shape_decay_mult()){
+      if(has_params_kernel_shape_decay_[learnable_param_id]){
+        CHECK_EQ(param_spec->kernel_shape_decay_mult(),params_kernel_shape_decay_[learnable_param_id])
+        <<"Shared param '"<<param_name << "' has mismatched kernel_shape_decay_mult.";
+      }else{
+        has_params_kernel_shape_decay_[learnable_param_id] = true;
+        params_kernel_shape_decay_[learnable_param_id] = param_spec->kernel_shape_decay_mult();
+      }
+    }
+    if(param_spec->block_group_lasso_size()){
+      if(has_params_block_group_lasso_[learnable_param_id]){
+        LOG(FATAL)<<"duplicate block_group_lasso among shared params.";
+      }else{
+        has_params_block_group_lasso_[learnable_param_id] = true;
+        vector<BlockGroupLassoSpec> block_spec;
+        for(int i = 0;i<param_spec->block_group_lasso_size();i++){
+          block_spec.push_back(param_spec->block_group_lasso(i));
+        }
+        params_block_group_lasso_[learnable_param_id] = block_spec;
+      }
+    }
   }
 }
 
@@ -613,6 +648,11 @@ const vector<Blob<Dtype>*>& Net<Dtype>::Forward(
 
 template <typename Dtype>
 void Net<Dtype>::BackwardFromTo(int start, int end) {
+  if(Caffe::mode() == Caffe::CPU){
+    #ifdef USE_MKL 
+    LOG(WARNING) << "MKL has precision problem?!";
+    #endif 
+  }
   CHECK_GE(end, 0);
   CHECK_LT(start, layers_.size());
   for (int i = start; i >= end; --i) {
@@ -812,6 +852,7 @@ void Net<Dtype>::CopyTrainedLayersFrom(const NetParameter& param) {
       const bool kReshape = false;
       target_blobs[j]->FromProto(source_layer.blobs(j), kReshape);
     }
+    layers_[target_layer_id]->WeightAlign();
   }
 }
 
@@ -966,6 +1007,7 @@ template <typename Dtype>
 void Net<Dtype>::Update() {
   for (int i = 0; i < learnable_params_.size(); ++i) {
     learnable_params_[i]->Update();
+    learnable_params_[i]->Zerout();
   }
 }
 

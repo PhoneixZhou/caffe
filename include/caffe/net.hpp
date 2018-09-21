@@ -323,6 +323,8 @@ class Net {
   /// the learning rate multipliers for learnable_params_
   vector<float> params_lr_;
   vector<bool> has_params_lr_;
+
+  ///////////////ssl///////////////////////////
   /// the weight decay multipliers for learnable_params_
   vector<float> params_weight_decay_;
   vector<bool> has_params_decay_;
@@ -344,6 +346,7 @@ class Net {
   //the regularization type
   vector<string> params_regularization_type_;
   vector<bool> has_params_regularization_type_;
+  /////////////////////end of ssl////////////////
 
   /// The bytes of memory used by this net
   size_t memory_used_;
