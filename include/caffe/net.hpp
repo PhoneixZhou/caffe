@@ -184,6 +184,15 @@ class Net {
   inline const vector<float>& params_weight_decay() const {
     return params_weight_decay_;
   }
+
+  inline const vector< shared_ptr< Blob<Dtype> >>& params_individual_weight_decay() const{
+    return params_individual_weight_decay_;
+  }
+
+  inline const vector< string >& params_regularization_type() const{
+    return params_regularization_type_;
+  }
+
   inline const vector<bool>& has_params_decay() const {
     return has_params_decay_;
   }

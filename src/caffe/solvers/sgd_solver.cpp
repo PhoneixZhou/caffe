@@ -129,6 +129,13 @@ void SGDSolver<Dtype>::ApplyUpdate() {
     LOG(INFO) << sparsity_msg_stream.str();
 
     sparsity_msg_stream.str("");
+    sparsity_msg_stream<< "  Row Sparsity %: \n";
+    for(int param_id = 0;param_id < this->net_->learnable_params().size();++param_id){
+      sparsity_msg_stream << GetGroupSparsity(param_id,false) << "\t";
+    }
+    LOG(INFO)<<sparsity_msg_stream.str();
+
+    sparsity_msg_stream.str("");
     sparsity_msg_stream << "   Block Sparsity %:\n";
     for (int param_id = 0; param_id < this->net_->learnable_params().size(); ++param_id){
       const vector<BlockGroupLassoSpec> net_params_block_group_lasso =
@@ -144,10 +151,12 @@ void SGDSolver<Dtype>::ApplyUpdate() {
   }
 
   ClipGradients();
+  Solver<Dtype>::total_regularization_term_ = Dtype(0);
   for (int param_id = 0; param_id < this->net_->learnable_params().size();
        ++param_id) {
     Normalize(param_id);
-    Regularize(param_id);
+    Solver<Dtype>::total_regularization_term_ += Regularize(param_id);
+    Solver<Dtype>::total_regularization_term_ += GroupLassoRegularize(param_id);
     ComputeUpdateValue(param_id, rate);
   }
   this->net_->Update();
@@ -184,23 +193,48 @@ void SGDSolver<Dtype>::Normalize(int param_id) {
 }
 
 template <typename Dtype>
-void SGDSolver<Dtype>::Regularize(int param_id) {
+Dtype SGDSolver<Dtype>::Regularize(int param_id) {
   const vector<Blob<Dtype>*>& net_params = this->net_->learnable_params();
-  const vector<float>& net_params_weight_decay =
-      this->net_->params_weight_decay();
+  const vector<float>& net_params_weight_decay = this->net_->params_weight_decay();
+  const vector<string>& net_params_local_regular_types = this->net_->params_regularization_type();
   Dtype weight_decay = this->param_.weight_decay();
   string regularization_type = this->param_.regularization_type();
+  string local_regularization_type = net_params_local_regular_types[param_id];
+  const vector< shared_ptr<Blob<Dtype> >>& params_individual_decays = this->net_->params_individual_weight_decay();
+  if(!local_regularization_type.empty()){
+    regularization_type = local_regularization_type;
+  }
+
   Dtype local_decay = weight_decay * net_params_weight_decay[param_id];
+  Dtype regularization_term = Dtype(0);
+  if(params_individual_decays[param_id]){
+    CHECK_EQ(net_params[param_id]->count(),params_individual_decays[param_id]->count());
+  }
+
   switch (Caffe::mode()) {
   case Caffe::CPU: {
     if (local_decay) {
       if (regularization_type == "L2") {
+
+        if(params_individual_decays[param_id]){
+          caffe_mul(net_params[param_id]->count(),
+            net_params[param_id]->cpu_data(),
+            params_individual_decays[param_id]->cpu_data(),
+            temp_[param_id]->mutable_cpu_data());
+        }
         // add weight decay
         caffe_axpy(net_params[param_id]->count(),
             local_decay,
             net_params[param_id]->cpu_data(),
             net_params[param_id]->mutable_cpu_diff());
-      } else if (regularization_type == "L1") {
+
+        regularization_term = caffe_cpu_dot(
+          net_params[param_id]->count(),
+          temp_[param_id]->cpu_data(),
+          net_params[param_id]->cpu_data());
+      }else{
+        
+      }else if (regularization_type == "L1") {
         caffe_cpu_sign(net_params[param_id]->count(),
             net_params[param_id]->cpu_data(),
             temp_[param_id]->mutable_cpu_data());

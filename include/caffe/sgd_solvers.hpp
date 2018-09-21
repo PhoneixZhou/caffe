@@ -29,7 +29,7 @@ class SGDSolver : public Solver<Dtype> {
  protected:
   void PreSolve();
   virtual void Normalize(int param_id);
-  virtual void Regularize(int param_id);
+  virtual Dtype Regularize(int param_id);
   //////ssl////////////////////////////
   virtual Dtype GetSparsity(int param_id);
   virtual Dtype GetGroupSparsity(int param_id, bool dimen = true);
